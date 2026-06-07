@@ -12,3 +12,5 @@ alembic
 hypothesis
 pytest
 httpx
+google-auth
+requests

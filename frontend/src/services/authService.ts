@@ -1,5 +1,13 @@
 import api from './api'
-import type { User, RegisterPayload, LoginPayload, Token } from '../types/index.d'
+import type {
+  User,
+  RegisterPayload,
+  LoginPayload,
+  Token,
+  GoogleLoginResponse,
+  SetPasswordPayload,
+  UpdateProfilePayload,
+} from '../types/index.d'
 
 export const register = (payload: RegisterPayload): Promise<User> =>
   api.post<User>('/api/auth/register', payload).then((res) => res.data)
@@ -19,8 +27,22 @@ export const getMe = (): Promise<User> =>
     })
     .then((res) => res.data)
 
+export const googleLogin = async (payload: { credential_token: string }): Promise<GoogleLoginResponse> => {
+  const res = await api.post<GoogleLoginResponse>('/api/auth/google-login', payload)
+  localStorage.setItem('access_token', res.data.access_token)
+  return res.data
+}
+
+export const setPassword = (payload: SetPasswordPayload): Promise<User> =>
+  api.post<User>('/api/auth/set-password', payload).then((res) => res.data)
+
+export const updateProfile = (payload: UpdateProfilePayload): Promise<User> =>
+  api.put<User>('/api/users/profile', payload).then((res) => res.data)
+
 // verifyOtp is retained for OTPVerification.tsx (future sprint feature)
 export const verifyOtp = (payload: { email: string; otp: string }): Promise<unknown> =>
   api.post('/api/auth/otp/verify', payload).then((res) => res.data)
 
-export default { register, login, getMe, verifyOtp }
+export default { register, login, getMe, googleLogin, setPassword, updateProfile, verifyOtp }
+
+

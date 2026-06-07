@@ -19,6 +19,8 @@ class UserRead(BaseModel):
     year: Optional[int]
     profile_photo: Optional[str]
     bio: Optional[str]
+    google_id: Optional[str] = None
+    auth_provider: str
     campus_score: int
     is_verified: bool
     created_at: datetime
@@ -36,3 +38,25 @@ class Token(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class GoogleLoginRequest(BaseModel):
+    credential_token: str
+
+
+class GoogleLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    is_new_user: bool
+
+
+class SetPasswordRequest(BaseModel):
+    password: str = Field(min_length=8)
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    branch: Optional[str] = None
+    year: Optional[int] = None
+    bio: Optional[str] = None
+

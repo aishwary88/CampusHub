@@ -1,11 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.schemas.user import UserCreate, UserRead, Token, LoginRequest
+from app.schemas.user import (
+    UserCreate,
+    UserRead,
+    Token,
+    LoginRequest,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
+    SetPasswordRequest,
+)
 from app.database.database import get_db
 from app.services import auth_service
 from app.auth import jwt_handler as jwt_utils
 from app.auth.jwt import get_current_user
+from app.auth.oauth import verify_google_token
 
 router = APIRouter()
 
@@ -67,3 +76,62 @@ def get_me(current_user=Depends(get_current_user)):
       (handled by get_current_user dependency).
     """
     return current_user
+
+
+@router.post("/google-login", response_model=GoogleLoginResponse)
+def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate with Google OAuth ID Token.
+    Validates domain, registers or logs in user, and returns CampusHub JWT + is_new_user.
+    """
+    try:
+        idinfo = verify_google_token(data.credential_token)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+    email = idinfo.get("email")
+    name = idinfo.get("name")
+    picture = idinfo.get("picture")
+    google_id = idinfo.get("sub")
+
+    if not email or not google_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to retrieve email or google id from token"
+        )
+
+    try:
+        user, is_new_user = auth_service.register_or_login_google(
+            db, email, name, google_id, picture
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+
+    token = jwt_utils.create_access_token(
+        {"sub": user.email, "id": user.id, "role": user.role}
+    )
+    return GoogleLoginResponse(
+        access_token=token,
+        token_type="bearer",
+        is_new_user=is_new_user
+    )
+
+
+@router.post("/set-password", response_model=UserRead)
+def set_password(
+    data: SetPasswordRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Set a backup password for the currently authenticated user.
+    """
+    updated_user = auth_service.set_backup_password(db, current_user, data.password)
+    return updated_user
+
