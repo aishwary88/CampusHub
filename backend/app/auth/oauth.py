@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+# Retrieve Google Client ID from environment. Support both backend and frontend naming conventions.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID")
 
 def verify_google_token(token: str) -> dict:
     """

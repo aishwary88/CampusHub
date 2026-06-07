@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import authService from '../../services/authService'
@@ -33,48 +33,9 @@ export default function AuthPage() {
     }
   }, [location.pathname])
 
-  // Load Google Identity Services SDK (only when a valid client ID is provided)
-  useEffect(() => {
-    if (!HAS_VALID_GOOGLE_CLIENT) {
-      // Avoid console errors when client ID is not configured
-      console.warn('Google client ID not configured. Skipping Google Identity initialization.')
-      return
-    }
+  const googleInitialized = useRef(false)
 
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    document.body.appendChild(script)
-
-    script.onload = () => {
-      if (window.google) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleCredential,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        })
-
-        window.google.accounts.id.renderButton(
-          document.getElementById('google-signin-btn'),
-          {
-            theme: 'filled_black',
-            size: 'large',
-            width: '380',
-            text: 'continue_with',
-            shape: 'rectangular',
-          }
-        )
-      }
-    }
-
-    return () => {
-      document.body.removeChild(script)
-    }
-  }, [HAS_VALID_GOOGLE_CLIENT])
-
-  const handleGoogleCredential = async (response: any) => {
+  const handleGoogleCredential = useCallback(async (response: any) => {
     setError(null)
     setLoading(true)
     try {
@@ -92,7 +53,58 @@ export default function AuthPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [navigate])
+
+  // Load Google Identity Services SDK (only when a valid client ID is provided)
+  useEffect(() => {
+    if (!HAS_VALID_GOOGLE_CLIENT) {
+      console.warn('Google client ID not configured. Skipping Google Identity initialization.')
+      return
+    }
+
+    const initializeGoogle = () => {
+      if (!window.google || googleInitialized.current) return
+      googleInitialized.current = true
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      })
+      const btn = document.getElementById('google-signin-btn')
+      if (btn) {
+        window.google.accounts.id.renderButton(btn, {
+          theme: 'filled_black',
+          size: 'large',
+          width: '380',
+          text: 'continue_with',
+          shape: 'rectangular',
+        })
+      }
+    }
+
+    // If SDK already loaded (e.g. hot-reload), initialize immediately
+    if (window.google) {
+      initializeGoogle()
+      return
+    }
+
+    // Otherwise inject the script once
+    if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+      const script = document.createElement('script')
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.defer = true
+      script.onload = initializeGoogle
+      document.body.appendChild(script)
+    } else {
+      // Script tag exists but not loaded yet — wait
+      const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]') as HTMLScriptElement
+      existing.addEventListener('load', initializeGoogle)
+    }
+  }, [HAS_VALID_GOOGLE_CLIENT, handleGoogleCredential])
+
+
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
