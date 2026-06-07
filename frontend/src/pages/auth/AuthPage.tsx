@@ -22,6 +22,7 @@ export default function AuthPage() {
   
   // Google Client ID
   const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '1047120619890-dummy.apps.googleusercontent.com'
+  const HAS_VALID_GOOGLE_CLIENT = !!GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('dummy')
 
   useEffect(() => {
     // Check if redirecting from registration or login
@@ -32,8 +33,14 @@ export default function AuthPage() {
     }
   }, [location.pathname])
 
-  // Load Google Identity Services SDK
+  // Load Google Identity Services SDK (only when a valid client ID is provided)
   useEffect(() => {
+    if (!HAS_VALID_GOOGLE_CLIENT) {
+      // Avoid console errors when client ID is not configured
+      console.warn('Google client ID not configured. Skipping Google Identity initialization.')
+      return
+    }
+
     const script = document.createElement('script')
     script.src = 'https://accounts.google.com/gsi/client'
     script.async = true
@@ -48,15 +55,15 @@ export default function AuthPage() {
           auto_select: false,
           cancel_on_tap_outside: true,
         })
-        
+
         window.google.accounts.id.renderButton(
           document.getElementById('google-signin-btn'),
-          { 
-            theme: 'filled_black', 
-            size: 'large', 
-            width: '380', 
+          {
+            theme: 'filled_black',
+            size: 'large',
+            width: '380',
             text: 'continue_with',
-            shape: 'rectangular'
+            shape: 'rectangular',
           }
         )
       }
@@ -65,7 +72,7 @@ export default function AuthPage() {
     return () => {
       document.body.removeChild(script)
     }
-  }, [])
+  }, [HAS_VALID_GOOGLE_CLIENT])
 
   const handleGoogleCredential = async (response: any) => {
     setError(null)
@@ -163,7 +170,13 @@ export default function AuthPage() {
 
         {/* Google Authentication Button */}
         <div className="mb-6 flex flex-col items-center justify-center">
-          <div id="google-signin-btn" className="w-full flex justify-center py-0.5 rounded-lg overflow-hidden border border-slate-700/50 hover:border-slate-500/50 transition duration-300 bg-black min-h-[44px]" />
+          <div id="google-signin-btn" className="w-full flex justify-center py-0.5 rounded-lg overflow-hidden border border-slate-700/50 hover:border-slate-500/50 transition duration-300 bg-black min-h-[44px]">
+            {!HAS_VALID_GOOGLE_CLIENT && (
+              <div className="w-full text-center text-xs text-slate-400 px-3 py-3">
+                Google login is unavailable until you set `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local` and restart the app.
+              </div>
+            )}
+          </div>
         </div>
 
         {/* OR Divider */}
